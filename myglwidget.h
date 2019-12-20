@@ -14,7 +14,6 @@
 #include <glm/gtx/matrix_transform_2d.hpp>
 
 #define GRID_SIZE 3
-#define PIXEL_DIM (GRID_SIZE+1)
 
 //
 // vertex bits
@@ -43,39 +42,28 @@ void SrcPolygonInitEdges(SrcPolygon *sp);
 float SrcPolygonArea(SrcPolygon *sp);
 
 struct PixelEdge {
-    int code;
-    int inside[2];
-    glm::vec2 v[2];
+    int code; // the type of edge
+    glm::vec2 v_ends[2]; // the ends of the edge
+    int inside_ends[2];  // inside flags for the ends
+    glm::vec2 v_edge[2]; // vertices inside the edge
+    int inside_edge[2];  // inside flags for the vertices inside the edge
 };
 
-struct Pixel {
-    glm::vec2 v;
-    int inside;
-    PixelEdge xedge;
-    PixelEdge yedge;
+struct PixelVertex {
+    glm::vec2 v; // the coordinate of the vertex
+    int inside;  // the inside flags for the vertex
 };
 
 int f2BisectSrcPolygon(SrcPolygon *sp, glm::vec2 v);
 
-struct BisectParams {
-    glm::vec2 v[2];
-    int inside[2];
-    PixelEdge *edge;
-};
-
-void PixelEdgeBisectSrcPolygon(BisectParams *bp, SrcPolygon *sp);
-void PixelEdgeBorderBisectSrcPolygon(BisectParams *bp, SrcPolygon *sp);
+void PixelEdgeBisectSrcPolygon(PixelEdge *pe, SrcPolygon *sp);
+void PixelEdgeBorderBisectSrcPolygon(PixelEdge *pe, SrcPolygon *sp);
 
 glm::vec2 f2IntersectionDelta(glm::vec2 a0, glm::vec2 a1, glm::vec2 b0, glm::vec2 b10);
 
 glm::ivec2 convert_ivec2_plus(glm::vec2 v);
 
 float f2cross(glm::vec2 &a, glm::vec2 &b);
-
-struct PixelVertices{
-    int Nvertices;
-    int indices[4];
-};
 
 struct Polygon {
     int N;
@@ -84,9 +72,6 @@ struct Polygon {
 
 void PolygonAddVertex(Polygon *p, glm::vec2 &v);
 float PolygonArea(Polygon *p);
-
-void PixelVerticesAddVertex(PixelVertices *pv, int index);
-
 
 class MyGLWidget : public QOpenGLWidget, protected QOpenGLFunctions
 {
@@ -108,15 +93,18 @@ private:
     bool theta_file_open;
     SrcPolygon srcPolygon;
     void InitSrcPolygon(void);
-    Pixel pixels[PIXEL_DIM][PIXEL_DIM];
-    int  pixelVertices[GRID_SIZE][GRID_SIZE];
+    PixelVertex pixelVertices[GRID_SIZE+1][GRID_SIZE+1];
+    PixelEdge xEdges[GRID_SIZE+1][GRID_SIZE];
+    PixelEdge yEdges[GRID_SIZE][GRID_SIZE+1];
+    int  pixelVFlags[GRID_SIZE][GRID_SIZE];
     Polygon polygon;
     int Npixelx;
     int Npixely;
     void InitPixels(void);
-    void BisectEdges(void);
+    //void BisectEdges(void);
     void DrawPixelVertices(int flags, SrcPolygon *sp, Polygon *polygon);
-    void DrawPolygons(void);
+    //void DrawPolygons(void);
+    void BisectAndDrawPixels(void);
     void DrawSrcPolygon(void);
     void DrawGrid(void);
 public slots:
