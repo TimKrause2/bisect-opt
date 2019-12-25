@@ -125,12 +125,12 @@ void MyGLWidget::InitSrcPolygon()
     //
     // interleaved vertices and edges test
     //
-//    M = glm::translate(M,glm::vec2(0.5,-0.5));
-//    M = glm::rotate(M,theta);
-//    M = glm::scale(M,glm::vec2(3.0,1.0));
-//    M = glm::rotate(M,3.0f*(float)M_PI/4.0f);
-//    M = glm::scale(M,glm::vec2(0.5,0.5));
-//    M = glm::translate(M,glm::vec2(-0.5,0.5));
+    M = glm::translate(M,glm::vec2(0.5,-0.5));
+    M = glm::rotate(M,theta);
+    M = glm::scale(M,glm::vec2(3.0,1.0));
+    M = glm::rotate(M,(float)M_PI/4.0f);
+    M = glm::scale(M,glm::vec2(0.5,0.5));
+    M = glm::translate(M,glm::vec2(-0.5,0.5));
 
     //
     // rotate about the center of the pixel
@@ -142,10 +142,10 @@ void MyGLWidget::InitSrcPolygon()
     //
     // three vertices in one pixel test
     //
-    M = glm::translate(M, glm::vec2(0.25f,-0.5f));
-    M = glm::rotate(M,theta);
-    M = glm::scale(M,glm::vec2(0.5f,0.5f));
-    M = glm::translate(M, glm::vec2(-0.5f,0.5f));
+//    M = glm::translate(M, glm::vec2(0.25f,-0.5f));
+//    M = glm::rotate(M,theta);
+//    M = glm::scale(M,glm::vec2(0.5f,0.5f));
+//    M = glm::translate(M, glm::vec2(-0.5f,0.5f));
 
 
 
@@ -327,7 +327,7 @@ void MyGLWidget::BisectAndDrawPixels(void){
                     if(yEdgeLeft->inside_ends[0]==0b1111){
                         PolygonAddVertex(&polygon,yEdgeLeft->v_ends[0]);
                     }else{
-                        PolygonAddVFlags(pixelVFlag,&srcPolygon,&polygon);
+                        PolygonAddMultiVFlag(&polygon, pixelVFlag, &srcPolygon);
                         iv_drawn = true;
                     }
                     break;
@@ -352,7 +352,7 @@ void MyGLWidget::BisectAndDrawPixels(void){
                         PolygonAddVertex(&polygon,xEdgeBottom->v_ends[0]);
                     }else{
                         if(!iv_drawn){
-                            PolygonAddVFlags(pixelVFlag,&srcPolygon,&polygon);
+                            PolygonAddMultiVFlag(&polygon, pixelVFlag, &srcPolygon);
                             iv_drawn = true;
                         }
                     }
@@ -379,7 +379,7 @@ void MyGLWidget::BisectAndDrawPixels(void){
                         PolygonAddVertex(&polygon,yEdgeRight->v_ends[1]);
                     }else{
                         if(!iv_drawn){
-                            PolygonAddVFlags(pixelVFlag,&srcPolygon,&polygon);
+                            PolygonAddMultiVFlag(&polygon, pixelVFlag, &srcPolygon);
                             iv_drawn = true;
                         }
                     }
@@ -406,7 +406,7 @@ void MyGLWidget::BisectAndDrawPixels(void){
                         PolygonAddVertex(&polygon,xEdgeTop->v_ends[1]);
                     }else{
                         if(!iv_drawn){
-                            PolygonAddVFlags(pixelVFlag,&srcPolygon,&polygon);
+                            PolygonAddMultiVFlag(&polygon, pixelVFlag, &srcPolygon);
                             iv_drawn = true;
                         }
                     }
@@ -512,28 +512,31 @@ void MyGLWidget::BisectEdges()
 */
 
 
-void MyGLWidget::PolygonAddVFlags(int flags, SrcPolygon *sp, Polygon *polygon)
+void MyGLWidget::PolygonAddSingleVFlag(Polygon *polygon, int flags, SrcPolygon *sp)
 {
-    glm::vec2 v;
-    glm::vec2 origin = pixelVertices[0][0].v;
     switch(flags){
-    case 0b0000:
-        return;
     case 0b0001:
         PolygonAddVertex(polygon,sp->vertices[0].v0);
         return;
     case 0b0010:
         PolygonAddVertex(polygon,sp->vertices[1].v0);
         return;
-    case 0b0011:
-        PolygonAddVertex(polygon,sp->vertices[0].v0);
-        PolygonAddVertex(polygon,sp->vertices[1].v0);
-        return;
     case 0b0100:
         PolygonAddVertex(polygon,sp->vertices[2].v0);
         return;
-    case 0b0101:
-        // this case is handled by another part of the program
+    case 0b1000:
+        PolygonAddVertex(polygon,sp->vertices[3].v0);
+        return;
+    }
+}
+
+void MyGLWidget::PolygonAddMultiVFlag(Polygon *polygon, int vflag, SrcPolygon *sp){
+    switch(vflag){
+    case 0b0000:
+        return;
+    case 0b0011:
+        PolygonAddVertex(polygon,sp->vertices[0].v0);
+        PolygonAddVertex(polygon,sp->vertices[1].v0);
         return;
     case 0b0110:
         PolygonAddVertex(polygon,sp->vertices[1].v0);
@@ -544,16 +547,9 @@ void MyGLWidget::PolygonAddVFlags(int flags, SrcPolygon *sp, Polygon *polygon)
         PolygonAddVertex(polygon,sp->vertices[1].v0);
         PolygonAddVertex(polygon,sp->vertices[2].v0);
         return;
-    case 0b1000:
-        PolygonAddVertex(polygon,sp->vertices[3].v0);
-        return;
     case 0b1001:
         PolygonAddVertex(polygon,sp->vertices[3].v0);
         PolygonAddVertex(polygon,sp->vertices[0].v0);
-        return;
-    case 0b1010:
-        // handled by another part of the program
-        // shouldn't happen
         return;
     case 0b1011:
         PolygonAddVertex(polygon,sp->vertices[3].v0);
@@ -574,15 +570,9 @@ void MyGLWidget::PolygonAddVFlags(int flags, SrcPolygon *sp, Polygon *polygon)
         PolygonAddVertex(polygon,sp->vertices[2].v0);
         PolygonAddVertex(polygon,sp->vertices[3].v0);
         return;
-    case 0b1111:
-        // should never happen but just in case
-        PolygonAddVertex(polygon,sp->vertices[0].v0);
-        PolygonAddVertex(polygon,sp->vertices[1].v0);
-        PolygonAddVertex(polygon,sp->vertices[2].v0);
-        PolygonAddVertex(polygon,sp->vertices[3].v0);
-        return;
     }
 }
+
 
 void MyGLWidget::PolygonAddEdgeForward(Polygon *polygon, PixelEdge *edge)
 {
@@ -643,14 +633,14 @@ void MyGLWidget::PolygonAddEdgeSingleVertexForward(Polygon *polygon, PixelEdge *
     case 2:
         vflag &= edge->vflag_edge[0];
         if(vflag){
-            PolygonAddVFlags(vflag, sp, polygon);
+            PolygonAddSingleVFlag(polygon, vflag, sp);
         }
         PolygonAddVertex(polygon,edge->v_edge[0]);
         break;
     case 3:
         vflag &= edge->vflag_edge[0];
         if(vflag){
-            PolygonAddVFlags(vflag, sp, polygon);
+            PolygonAddSingleVFlag(polygon, vflag, sp);
         }
         PolygonAddVertex(polygon,edge->v_edge[0]);
         PolygonAddVertex(polygon,edge->v_edge[1]);
@@ -669,7 +659,7 @@ void MyGLWidget::PolygonAddEdgeSingleVertexReverse(Polygon *polygon, PixelEdge *
     case 1:
         vflag &= edge->vflag_edge[1];
         if(vflag){
-            PolygonAddVFlags(vflag, sp, polygon);
+            PolygonAddSingleVFlag(polygon, vflag, sp);
         }
         PolygonAddVertex(polygon,edge->v_edge[1]);
         break;
@@ -680,7 +670,7 @@ void MyGLWidget::PolygonAddEdgeSingleVertexReverse(Polygon *polygon, PixelEdge *
     case 3:
         vflag &= edge->vflag_edge[1];
         if(vflag){
-            PolygonAddVFlags(vflag, sp, polygon);
+            PolygonAddSingleVFlag(polygon, vflag, sp);
         }
         PolygonAddVertex(polygon,edge->v_edge[1]);
         PolygonAddVertex(polygon,edge->v_edge[0]);

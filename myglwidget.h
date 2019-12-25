@@ -103,7 +103,8 @@ private:
     int Npixely;
     void InitPixels(void);
     //void BisectEdges(void);
-    void PolygonAddVFlags(int flags, SrcPolygon *sp, Polygon *polygon);
+    void PolygonAddSingleVFlag(Polygon *polygon, int flags, SrcPolygon *sp);
+    void PolygonAddMultiVFlag(Polygon *polygon, int vflag, SrcPolygon *sp);
     void PolygonAddEdgeForward(Polygon *polygon, PixelEdge *edge);
     void PolygonAddEdgeReverse(Polygon *polygon, PixelEdge *edge);
     void PolygonAddEdgeSingleVertexForward(Polygon *polygon, PixelEdge *edge, int vflag, SrcPolygon *sp);
