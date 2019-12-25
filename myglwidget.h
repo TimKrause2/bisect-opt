@@ -47,6 +47,7 @@ struct PixelEdge {
     int inside_ends[2];  // inside flags for the ends
     glm::vec2 v_edge[2]; // vertices inside the edge
     int inside_edge[2];  // inside flags for the vertices inside the edge
+    int vflag_edge[2];   // the vertex flags for the vertices inside the edge
 };
 
 struct PixelVertex {
@@ -102,10 +103,15 @@ private:
     int Npixely;
     void InitPixels(void);
     //void BisectEdges(void);
-    void DrawPixelVertices(int flags, SrcPolygon *sp, Polygon *polygon);
+    void PolygonAddVFlags(int flags, SrcPolygon *sp, Polygon *polygon);
+    void PolygonAddEdgeForward(Polygon *polygon, PixelEdge *edge);
+    void PolygonAddEdgeReverse(Polygon *polygon, PixelEdge *edge);
+    void PolygonAddEdgeSingleVertexForward(Polygon *polygon, PixelEdge *edge, int vflag, SrcPolygon *sp);
+    void PolygonAddEdgeSingleVertexReverse(Polygon *polygon, PixelEdge *edge, int vflag, SrcPolygon *sp);
     //void DrawPolygons(void);
     void BisectAndDrawPixels(void);
     void DrawSrcPolygon(void);
+    void DrawPolygon(void);
     void DrawGrid(void);
 public slots:
     void timer_func(void);

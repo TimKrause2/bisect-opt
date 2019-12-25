@@ -84,6 +84,8 @@ void MyGLWidget::paintGL(){
     BisectAndDrawPixels();
     //DrawPolygons();
     DrawSrcPolygon();
+    alpha += dalpha;
+    if(alpha>=1.0f)alpha-=1.0f;
 
 }
 
@@ -97,11 +99,8 @@ void MyGLWidget::InitSrcPolygon()
     };
 
     glm::mat3 M(1.0f);
-    glm::vec2 Tpre(-0.5f,0.5f);
-    glm::vec2 Tpost(alpha*2.0,-alpha*2.0);
-    glm::vec2 S(1.0f,1.0f);
     if(theta_file_open && !theta_file_write){
-        theta_file.read((char*)&theta,sizeof(theta));
+        theta_file.read((char*)&alpha,sizeof(alpha));
         if(theta_file.atEnd()){
             theta_file.seek(0);
         }
@@ -109,16 +108,61 @@ void MyGLWidget::InitSrcPolygon()
         float offset = (float)(ceil(drand48()*4)*M_PI/2);
         theta = 2.0*M_PI*alpha;
     }
-    M = glm::translate(M,Tpost);
-    M = glm::rotate(M,theta);
-    M = glm::scale(M,S);
-    M = glm::translate(M,Tpre);
+    glm::vec2 Tpre(-alpha,alpha);
+    glm::vec2 Tpost(0.0f,-alpha);
+    glm::vec2 S(1.0f,1.0f);
+
+    //
+    // shear and scaling test
+    //
+//    M = glm::translate(M,glm::vec2(0.0,alpha));
+//    M = glm::shearX(M,1.0f);
+//    M = glm::scale(M,glm::vec2(0.75f,1.1f));
+
+    //
+    // another shear and scaling test along the axis
+    //
+//    M = glm::translate(M,glm::vec2(alpha,0.0f));
+//    M = glm::shearY(M,1.0f);
+//    M = glm::scale(M,glm::vec2(1.1f,0.75f));
+
+
+
+
+
+
+
+
+    //
+    // interleaved vertices and edges test
+    //
+//    M = glm::translate(M,glm::vec2(0.5,-0.5));
+//    M = glm::rotate(M,theta);
+//    M = glm::scale(M,glm::vec2(3.0,1.0));
+//    M = glm::rotate(M,5.0f*(float)M_PI/4.0f);
+//    M = glm::scale(M,glm::vec2(0.5,0.5));
+//    M = glm::translate(M,glm::vec2(-0.5,0.5));
+
+    //
+    // rotate about the center of the pixel
+    //
+    M = glm::translate(M,glm::vec2(0.5f,-0.5f));
+    M = glm::rotate(M,2.0f*(float)M_PI*alpha);
+    M = glm::translate(M,glm::vec2(-0.5f,0.5f));
+
+
+
+
+
+    //M = glm::translate(M,Tpost);
+    //M = glm::shearX(M,-1.0f/64.0f);
+    //M = glm::rotate(M,theta);
+    //M = glm::scale(M,S);
+    //M = glm::translate(M,Tpre);
     SrcPolygonInitVertices(&srcPolygon, vertices, M);
 
     SrcPolygonInitEdges(&srcPolygon);
 
-    alpha += dalpha;
-    if(alpha>=1.0f)alpha-=1.0f;
 }
 
 void MyGLWidget::InitPixels()
@@ -271,161 +315,272 @@ void MyGLWidget::BisectAndDrawPixels(void){
                 }
             }
             polygon.N = 0;
-            glBegin(GL_POLYGON);
-            bool iv_drawn = false;
-            //
-            // draw the left edge
-            //
-            switch(yEdgeLeft->code){
-            case 0:
-                if(yEdgeLeft->inside_ends[0]==0b1111){
-                    v = yEdgeLeft->v_ends[0] - origin;
-                    glVertex2f(v.x,v.y);
-                    PolygonAddVertex(&polygon,v);
+            int pixelVFlag = pixelVFlags[y][x];
+            if(pixelVFlag==0b0001 || pixelVFlag==0b0010
+                    || pixelVFlag==0b0100 || pixelVFlag==0b1000){
+                //
+                // single vertex in the pixel
+                //
+                PolygonAddEdgeSingleVertexForward(&polygon,yEdgeLeft,pixelVFlag,&srcPolygon);
+                PolygonAddEdgeSingleVertexForward(&polygon,xEdgeBottom,pixelVFlag,&srcPolygon);
+                PolygonAddEdgeSingleVertexReverse(&polygon,yEdgeRight,pixelVFlag,&srcPolygon);
+                PolygonAddEdgeSingleVertexReverse(&polygon,xEdgeTop,pixelVFlag,&srcPolygon);
+            }else if(pixelVFlag==0b0101){
+                // vertices in the pixel and edge vertices are interleaved
+                //
+                // find the diagonal
+                //
+                glm::vec2 vdiag = srcPolygon.vertices[1].v0 - srcPolygon.vertices[3].v0;
+                //
+                // determine the quadrant that the diagonal is in
+                //
+                int quadrant;
+                if(vdiag.y<=0.0f){
+                    if(vdiag.x<=0.0f){
+                        quadrant = 0;
+                    }else{
+                        quadrant = 1;
+                    }
                 }else{
-                    DrawPixelVertices(pixelVFlags[y][x],&srcPolygon,&polygon);
-                    iv_drawn = true;
-                }
-                break;
-            case 1:
-                v = yEdgeLeft->v_ends[0] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                v = yEdgeLeft->v_edge[1] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                break;
-            case 2:
-                v = yEdgeLeft->v_edge[0] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                break;
-            case 3:
-                v = yEdgeLeft->v_edge[0] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                v = yEdgeLeft->v_edge[1] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                break;
-            }
-            //
-            // draw the bottom edge
-            //
-            switch(xEdgeBottom->code){
-            case 0:
-                if(xEdgeBottom->inside_ends[0]==0b1111){
-                    v = xEdgeBottom->v_ends[0] - origin;
-                    glVertex2f(v.x,v.y);
-                    PolygonAddVertex(&polygon,v);
-                }else{
-                    if(!iv_drawn){
-                        DrawPixelVertices(pixelVFlags[y][x],&srcPolygon,&polygon);
-                        iv_drawn = true;
+                    if(vdiag.x>=0.0f){
+                        quadrant = 2;
+                    }else{
+                        quadrant = 3;
                     }
                 }
-                break;
-            case 1:
-                v = xEdgeBottom->v_ends[0] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                v = xEdgeBottom->v_edge[1] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                break;
-            case 2:
-                v = xEdgeBottom->v_edge[0] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                break;
-            case 3:
-                v = xEdgeBottom->v_edge[0] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                v = xEdgeBottom->v_edge[1] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                break;
-            }
-            //
-            // draw the right edge - it's in the reverse direction to
-            // the drawing order
-            //
-            switch(yEdgeRight->code){
-            case 0:
-                if(yEdgeRight->inside_ends[1]==0b1111){
-                    v = yEdgeRight->v_ends[1] - origin;
-                    glVertex2f(v.x,v.y);
-                    PolygonAddVertex(&polygon,v);
+                //
+                // render the first contained source vertex
+                //
+                PolygonAddVertex(&polygon,srcPolygon.vertices[0].v0);
+                //
+                // render the sides for the quadrant
+                //
+                switch(quadrant){
+                case 0:
+                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
+                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
+                    break;
+                case 1:
+                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
+                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
+                    break;
+                case 2:
+                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
+                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
+                    break;
+                case 3:
+                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
+                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
+                    break;
+                }
+                //
+                // render the second contained source vertex
+                //
+                PolygonAddVertex(&polygon,srcPolygon.vertices[2].v0);
+                //
+                // render the opposite sides for the quadrant
+                //
+                switch(quadrant){
+                case 0:
+                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
+                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
+                    break;
+                case 1:
+                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
+                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
+                    break;
+                case 2:
+                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
+                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
+                    break;
+                case 3:
+                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
+                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
+                    break;
+                }
+            }else if(pixelVFlag==0b1010){
+                // vertices in the pixel and edge vertices are interleaved
+                //
+                // find the diagonal
+                //
+                glm::vec2 vdiag = srcPolygon.vertices[2].v0 - srcPolygon.vertices[0].v0;
+                //
+                // determine the quadrant that the diagonal is in
+                //
+                int quadrant;
+                if(vdiag.y<=0.0f){
+                    if(vdiag.x<=0.0f){
+                        quadrant = 0;
+                    }else{
+                        quadrant = 1;
+                    }
                 }else{
-                    if(!iv_drawn){
-                        DrawPixelVertices(pixelVFlags[y][x],&srcPolygon,&polygon);
-                        iv_drawn = true;
+                    if(vdiag.x>=0.0f){
+                        quadrant = 2;
+                    }else{
+                        quadrant = 3;
                     }
                 }
-                break;
-            case 1:
-                v = yEdgeRight->v_edge[1] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                break;
-            case 2:
-                v = yEdgeRight->v_ends[1] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                v = yEdgeRight->v_edge[0] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                break;
-            case 3:
-                v = yEdgeRight->v_edge[1] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                v = yEdgeRight->v_edge[0] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                break;
-            }
-            //
-            // draw the top edge - it's in the reverse direction
-            // as well
-            //
-            switch(xEdgeTop->code){
-            case 0:
-                if(xEdgeTop->inside_ends[1]==0b1111){
-                    v = xEdgeTop->v_ends[1] - origin;
-                    glVertex2f(v.x,v.y);
-                    PolygonAddVertex(&polygon,v);
-                }else{
-                    if(!iv_drawn){
-                        DrawPixelVertices(pixelVFlags[y][x],&srcPolygon,&polygon);
+                //
+                // render the first contained source vertex
+                //
+                PolygonAddVertex(&polygon,srcPolygon.vertices[1].v0);
+                //
+                // render the sides for the quadrant
+                //
+                switch(quadrant){
+                case 0:
+                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
+                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
+                    break;
+                case 1:
+                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
+                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
+                    break;
+                case 2:
+                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
+                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
+                    break;
+                case 3:
+                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
+                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
+                    break;
+                }
+                //
+                // render the second contained source vertex
+                //
+                PolygonAddVertex(&polygon,srcPolygon.vertices[3].v0);
+                //
+                // render the opposite sides for the quadrant
+                //
+                switch(quadrant){
+                case 0:
+                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
+                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
+                    break;
+                case 1:
+                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
+                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
+                    break;
+                case 2:
+                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
+                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
+                    break;
+                case 3:
+                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
+                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
+                    break;
+                }
+            }else{
+                // vertices in the pixel are drawn all at once
+                bool iv_drawn = false;
+                //
+                // draw the left edge
+                //
+                switch(yEdgeLeft->code){
+                case 0:
+                    if(yEdgeLeft->inside_ends[0]==0b1111){
+                        PolygonAddVertex(&polygon,yEdgeLeft->v_ends[0]);
+                    }else{
+                        PolygonAddVFlags(pixelVFlag,&srcPolygon,&polygon);
                         iv_drawn = true;
                     }
+                    break;
+                case 1:
+                    PolygonAddVertex(&polygon,yEdgeLeft->v_ends[0]);
+                    PolygonAddVertex(&polygon,yEdgeLeft->v_edge[1]);
+                    break;
+                case 2:
+                    PolygonAddVertex(&polygon,yEdgeLeft->v_edge[0]);
+                    break;
+                case 3:
+                    PolygonAddVertex(&polygon,yEdgeLeft->v_edge[0]);
+                    PolygonAddVertex(&polygon,yEdgeLeft->v_edge[1]);
+                    break;
                 }
-                break;
-            case 1:
-                v = xEdgeTop->v_edge[1] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                break;
-            case 2:
-                v = xEdgeTop->v_ends[1] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                v = xEdgeTop->v_edge[0] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                break;
-            case 3:
-                v = xEdgeTop->v_edge[1] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                v = xEdgeTop->v_edge[0] - origin;
-                glVertex2f(v.x,v.y);
-                PolygonAddVertex(&polygon,v);
-                break;
+                //
+                // draw the bottom edge
+                //
+                switch(xEdgeBottom->code){
+                case 0:
+                    if(xEdgeBottom->inside_ends[0]==0b1111){
+                        PolygonAddVertex(&polygon,xEdgeBottom->v_ends[0]);
+                    }else{
+                        if(!iv_drawn){
+                            PolygonAddVFlags(pixelVFlag,&srcPolygon,&polygon);
+                            iv_drawn = true;
+                        }
+                    }
+                    break;
+                case 1:
+                    PolygonAddVertex(&polygon,xEdgeBottom->v_ends[0]);
+                    PolygonAddVertex(&polygon,xEdgeBottom->v_edge[1]);
+                    break;
+                case 2:
+                    PolygonAddVertex(&polygon,xEdgeBottom->v_edge[0]);
+                    break;
+                case 3:
+                    PolygonAddVertex(&polygon,xEdgeBottom->v_edge[0]);
+                    PolygonAddVertex(&polygon,xEdgeBottom->v_edge[1]);
+                    break;
+                }
+                //
+                // draw the right edge - it's in the reverse direction to
+                // the drawing order
+                //
+                switch(yEdgeRight->code){
+                case 0:
+                    if(yEdgeRight->inside_ends[1]==0b1111){
+                        PolygonAddVertex(&polygon,yEdgeRight->v_ends[1]);
+                    }else{
+                        if(!iv_drawn){
+                            PolygonAddVFlags(pixelVFlag,&srcPolygon,&polygon);
+                            iv_drawn = true;
+                        }
+                    }
+                    break;
+                case 1:
+                    PolygonAddVertex(&polygon,yEdgeRight->v_edge[1]);
+                    break;
+                case 2:
+                    PolygonAddVertex(&polygon,yEdgeRight->v_ends[1]);
+                    PolygonAddVertex(&polygon,yEdgeRight->v_edge[0]);
+                    break;
+                case 3:
+                    PolygonAddVertex(&polygon,yEdgeRight->v_edge[1]);
+                    PolygonAddVertex(&polygon,yEdgeRight->v_edge[0]);
+                    break;
+                }
+                //
+                // draw the top edge - it's in the reverse direction
+                // as well
+                //
+                switch(xEdgeTop->code){
+                case 0:
+                    if(xEdgeTop->inside_ends[1]==0b1111){
+                        PolygonAddVertex(&polygon,xEdgeTop->v_ends[1]);
+                    }else{
+                        if(!iv_drawn){
+                            PolygonAddVFlags(pixelVFlag,&srcPolygon,&polygon);
+                            iv_drawn = true;
+                        }
+                    }
+                    break;
+                case 1:
+                    PolygonAddVertex(&polygon,xEdgeTop->v_edge[1]);
+                    break;
+                case 2:
+                    PolygonAddVertex(&polygon,xEdgeTop->v_ends[1]);
+                    PolygonAddVertex(&polygon,xEdgeTop->v_edge[0]);
+                    break;
+                case 3:
+                    PolygonAddVertex(&polygon,xEdgeTop->v_edge[1]);
+                    PolygonAddVertex(&polygon,xEdgeTop->v_edge[0]);
+                    break;
+                }
+
             }
-            glEnd();
+            DrawPolygon();
             total_area += PolygonArea(&polygon);
         }
         //
@@ -445,6 +600,9 @@ void MyGLWidget::BisectAndDrawPixels(void){
     float area_error = (total_area - src_area)/src_area;
     if(fabsf(area_error)>0.05f){
         qDebug("area_error:%f",area_error);
+        if(theta_file.openMode()==QIODevice::WriteOnly){
+            theta_file.write((char*)&alpha,sizeof(alpha));
+        }
     }
 }
 
@@ -509,7 +667,7 @@ void MyGLWidget::BisectEdges()
 */
 
 
-void MyGLWidget::DrawPixelVertices(int flags, SrcPolygon *sp, Polygon *polygon)
+void MyGLWidget::PolygonAddVFlags(int flags, SrcPolygon *sp, Polygon *polygon)
 {
     glm::vec2 v;
     glm::vec2 origin = pixelVertices[0][0].v;
@@ -517,123 +675,167 @@ void MyGLWidget::DrawPixelVertices(int flags, SrcPolygon *sp, Polygon *polygon)
     case 0b0000:
         return;
     case 0b0001:
-        v = sp->vertices[0].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[0].v0);
         return;
     case 0b0010:
-        v = sp->vertices[1].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[1].v0);
         return;
     case 0b0011:
-        v = sp->vertices[0].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[1].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[0].v0);
+        PolygonAddVertex(polygon,sp->vertices[1].v0);
         return;
     case 0b0100:
-        v = sp->vertices[2].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[2].v0);
         return;
     case 0b0101:
         // this case is handled by another part of the program
         return;
     case 0b0110:
-        v = sp->vertices[1].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[2].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[1].v0);
+        PolygonAddVertex(polygon,sp->vertices[2].v0);
         return;
     case 0b0111:
-        v = sp->vertices[0].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[1].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[2].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[0].v0);
+        PolygonAddVertex(polygon,sp->vertices[1].v0);
+        PolygonAddVertex(polygon,sp->vertices[2].v0);
         return;
     case 0b1000:
-        v = sp->vertices[3].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[3].v0);
         return;
     case 0b1001:
-        v = sp->vertices[3].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[0].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[3].v0);
+        PolygonAddVertex(polygon,sp->vertices[0].v0);
         return;
     case 0b1010:
         // handled by another part of the program
         // shouldn't happen
         return;
     case 0b1011:
-        v = sp->vertices[3].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[0].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[1].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[3].v0);
+        PolygonAddVertex(polygon,sp->vertices[0].v0);
+        PolygonAddVertex(polygon,sp->vertices[1].v0);
         return;
     case 0b1100:
-        v = sp->vertices[2].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[3].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[2].v0);
+        PolygonAddVertex(polygon,sp->vertices[3].v0);
         return;
     case 0b1101:
-        v = sp->vertices[2].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[3].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[0].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[2].v0);
+        PolygonAddVertex(polygon,sp->vertices[3].v0);
+        PolygonAddVertex(polygon,sp->vertices[0].v0);
         return;
     case 0b1110:
-        v = sp->vertices[1].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[2].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[3].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[1].v0);
+        PolygonAddVertex(polygon,sp->vertices[2].v0);
+        PolygonAddVertex(polygon,sp->vertices[3].v0);
         return;
     case 0b1111:
         // should never happen but just in case
-        v = sp->vertices[0].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[1].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[2].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
-        v = sp->vertices[3].v0 - origin;
-        glVertex2f(v.x,v.y);
-        PolygonAddVertex(polygon,v);
+        PolygonAddVertex(polygon,sp->vertices[0].v0);
+        PolygonAddVertex(polygon,sp->vertices[1].v0);
+        PolygonAddVertex(polygon,sp->vertices[2].v0);
+        PolygonAddVertex(polygon,sp->vertices[3].v0);
         return;
+    }
+}
+
+void MyGLWidget::PolygonAddEdgeForward(Polygon *polygon, PixelEdge *edge)
+{
+    switch(edge->code){
+    case 0:
+        if(edge->inside_ends[0]==0b1111){
+            PolygonAddVertex(polygon,edge->v_ends[0]);
+        }
+        break;
+    case 1:
+        PolygonAddVertex(polygon,edge->v_ends[0]);
+        PolygonAddVertex(polygon,edge->v_edge[1]);
+        break;
+    case 2:
+        PolygonAddVertex(polygon,edge->v_edge[0]);
+        break;
+    case 3:
+        PolygonAddVertex(polygon,edge->v_edge[0]);
+        PolygonAddVertex(polygon,edge->v_edge[1]);
+        break;
+    }
+}
+
+void MyGLWidget::PolygonAddEdgeReverse(Polygon *polygon, PixelEdge *edge)
+{
+    switch(edge->code){
+    case 0:
+        if(edge->inside_ends[1]==0b1111){
+            PolygonAddVertex(polygon,edge->v_ends[1]);
+        }
+        break;
+    case 1:
+        PolygonAddVertex(polygon,edge->v_edge[1]);
+        break;
+    case 2:
+        PolygonAddVertex(polygon,edge->v_ends[1]);
+        PolygonAddVertex(polygon,edge->v_edge[0]);
+        break;
+    case 3:
+        PolygonAddVertex(polygon,edge->v_edge[1]);
+        PolygonAddVertex(polygon,edge->v_edge[0]);
+        break;
+    }
+}
+
+void MyGLWidget::PolygonAddEdgeSingleVertexForward(Polygon *polygon, PixelEdge *edge, int vflag, SrcPolygon *sp)
+{
+    switch(edge->code){
+    case 0:
+        if(edge->inside_ends[0]==0b1111){
+            PolygonAddVertex(polygon,edge->v_ends[0]);
+        }
+        break;
+    case 1:
+        PolygonAddVertex(polygon,edge->v_ends[0]);
+        PolygonAddVertex(polygon,edge->v_edge[1]);
+        break;
+    case 2:
+        if(edge->vflag_edge[0]&vflag){
+            PolygonAddVFlags(vflag, sp, polygon);
+        }
+        PolygonAddVertex(polygon,edge->v_edge[0]);
+        break;
+    case 3:
+        if(edge->vflag_edge[0]&vflag){
+            PolygonAddVFlags(vflag, sp, polygon);
+        }
+        PolygonAddVertex(polygon,edge->v_edge[0]);
+        PolygonAddVertex(polygon,edge->v_edge[1]);
+        break;
+    }
+}
+
+void MyGLWidget::PolygonAddEdgeSingleVertexReverse(Polygon *polygon, PixelEdge *edge, int vflag, SrcPolygon *sp)
+{
+    switch(edge->code){
+    case 0:
+        if(edge->inside_ends[1]==0b1111){
+            PolygonAddVertex(polygon,edge->v_ends[1]);
+        }
+        break;
+    case 1:
+        if(edge->vflag_edge[1]&vflag){
+            PolygonAddVFlags(vflag, sp, polygon);
+        }
+        PolygonAddVertex(polygon,edge->v_edge[1]);
+        break;
+    case 2:
+        PolygonAddVertex(polygon,edge->v_ends[1]);
+        PolygonAddVertex(polygon,edge->v_edge[0]);
+        break;
+    case 3:
+        if(edge->vflag_edge[1]&vflag){
+            PolygonAddVFlags(vflag, sp, polygon);
+        }
+        PolygonAddVertex(polygon,edge->v_edge[1]);
+        PolygonAddVertex(polygon,edge->v_edge[0]);
+        break;
     }
 }
 
@@ -897,6 +1099,23 @@ void MyGLWidget::DrawSrcPolygon()
     glEnd();
 }
 
+void MyGLWidget::DrawPolygon()
+{
+    glm::vec2 origin = pixelVertices[0][0].v;
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glTranslatef(-origin.x,-origin.y,0.0f);
+
+    glBegin(GL_POLYGON);
+    for(int i=0;i<polygon.N;i++){
+        glm::vec2 v = polygon.v[i];
+        glVertex2f(v.x,v.y);
+    }
+    glEnd();
+    glPopMatrix();
+
+}
+
 void MyGLWidget::DrawGrid(void){
     glBegin(GL_LINES);
     for(int x=0;x<4;x++){
@@ -973,11 +1192,13 @@ void PixelEdgeBisectSrcPolygon(PixelEdge *pe, SrcPolygon *sp)
                 pe->code = 1;
                 pe->v_edge[1] = f2IntersectionDelta(pe->v_ends[0],pe->v_ends[1],sp->vertices[e].v0,sp->vertices[e].v10);
                 pe->inside_edge[1] = f2BisectSrcPolygon(sp,pe->v_edge[1]);
+                pe->vflag_edge[1] = edge_bit;
             }else{
                 // v1 is inside
                 pe->code = 2;
                 pe->v_edge[0] = f2IntersectionDelta(pe->v_ends[0],pe->v_ends[1],sp->vertices[e].v0,sp->vertices[e].v10);
                 pe->inside_edge[0] = f2BisectSrcPolygon(sp,pe->v_edge[0]);
+                pe->vflag_edge[0] = edge_bit;
             }
             break;
         case 1:
@@ -993,11 +1214,13 @@ void PixelEdgeBisectSrcPolygon(PixelEdge *pe, SrcPolygon *sp)
                     pe->code = 1;
                     pe->v_edge[1] = f2IntersectionDelta(pe->v_ends[0],pe->v_edge[1],sp->vertices[e].v0,sp->vertices[e].v10);
                     pe->inside_edge[1] = f2BisectSrcPolygon(sp,pe->v_edge[1]);
+                    pe->vflag_edge[1] = edge_bit;
                 }else{
                     // v_edge[1] is inside
                     pe->code = 3;
                     pe->v_edge[0] = f2IntersectionDelta(pe->v_ends[0],pe->v_edge[1],sp->vertices[e].v0,sp->vertices[e].v10);
                     pe->inside_edge[0] = f2BisectSrcPolygon(sp,pe->v_edge[0]);
+                    pe->vflag_edge[0] = edge_bit;
                 }
             }
             break;
@@ -1014,11 +1237,13 @@ void PixelEdgeBisectSrcPolygon(PixelEdge *pe, SrcPolygon *sp)
                     pe->code = 2;
                     pe->v_edge[0] = f2IntersectionDelta(pe->v_edge[0],pe->v_ends[1],sp->vertices[e].v0,sp->vertices[e].v10);
                     pe->inside_edge[0] = f2BisectSrcPolygon(sp,pe->v_edge[0]);
+                    pe->vflag_edge[0] = edge_bit;
                 }else{
                     // edge->v[0] is inside
                     pe->code = 3;
                     pe->v_edge[1] = f2IntersectionDelta(pe->v_edge[0],pe->v_ends[1],sp->vertices[e].v0,sp->vertices[e].v10);
                     pe->inside_edge[1] = f2BisectSrcPolygon(sp,pe->v_edge[1]);
+                    pe->vflag_edge[1] = edge_bit;
                 }
             }
             break;
@@ -1029,10 +1254,12 @@ void PixelEdgeBisectSrcPolygon(PixelEdge *pe, SrcPolygon *sp)
                     pe->code = 3;
                     pe->v_edge[1] = f2IntersectionDelta(pe->v_edge[0],pe->v_edge[1],sp->vertices[e].v0,sp->vertices[e].v10);
                     pe->inside_edge[1] = f2BisectSrcPolygon(sp,pe->v_edge[1]);
+                    pe->vflag_edge[1] = edge_bit;
                 }else{
                     pe->code = 3;
                     pe->v_edge[0] = f2IntersectionDelta(pe->v_edge[0],pe->v_edge[1],sp->vertices[e].v0,sp->vertices[e].v10);
                     pe->inside_edge[0] = f2BisectSrcPolygon(sp,pe->v_edge[0]);
+                    pe->vflag_edge[0] = edge_bit;
                 }
             }
             break;
@@ -1053,10 +1280,12 @@ void PixelEdgeBorderBisectSrcPolygon(PixelEdge *pe, SrcPolygon *sp)
                 // v0 is inside
                 pe->code = 1;
                 pe->v_edge[1] = f2IntersectionDelta(pe->v_ends[0],pe->v_ends[1],sp->vertices[0].v0,sp->vertices[0].v10);
+                pe->vflag_edge[1] = 0b0001;
             }else{
                 // v1 is inside
                 pe->code = 2;
                 pe->v_edge[0] = f2IntersectionDelta(pe->v_ends[0],pe->v_ends[1],sp->vertices[0].v0,sp->vertices[0].v10);
+                pe->vflag_edge[0] = 0b0001;
             }
         }
         return;
@@ -1066,10 +1295,12 @@ void PixelEdgeBorderBisectSrcPolygon(PixelEdge *pe, SrcPolygon *sp)
                 // v0 is inside
                 pe->code = 1;
                 pe->v_edge[1] = f2IntersectionDelta(pe->v_ends[0],pe->v_ends[1],sp->vertices[1].v0,sp->vertices[1].v10);
+                pe->vflag_edge[1] = 0b0010;
             }else{
                 // v1 is inside
                 pe->code = 2;
                 pe->v_edge[0] = f2IntersectionDelta(pe->v_ends[0],pe->v_ends[1],sp->vertices[1].v0,sp->vertices[1].v10);
+                pe->vflag_edge[0] = 0b0010;
             }
         }
         return;
@@ -1079,10 +1310,12 @@ void PixelEdgeBorderBisectSrcPolygon(PixelEdge *pe, SrcPolygon *sp)
                 // v0 is inside
                 pe->code = 1;
                 pe->v_edge[1] = f2IntersectionDelta(pe->v_ends[0],pe->v_ends[1],sp->vertices[2].v0,sp->vertices[2].v10);
+                pe->vflag_edge[1] = 0b0100;
             }else{
                 // v1 is inside
                 pe->code = 2;
                 pe->v_edge[0] = f2IntersectionDelta(pe->v_ends[0],pe->v_ends[1],sp->vertices[2].v0,sp->vertices[2].v10);
+                pe->vflag_edge[0] = 0b0100;
             }
         }
         return;
@@ -1092,10 +1325,12 @@ void PixelEdgeBorderBisectSrcPolygon(PixelEdge *pe, SrcPolygon *sp)
                 // v0 is inside
                 pe->code = 1;
                 pe->v_edge[1] = f2IntersectionDelta(pe->v_ends[0],pe->v_ends[1],sp->vertices[3].v0,sp->vertices[3].v10);
+                pe->vflag_edge[1] = 0b1000;
             }else{
                 // v1 is inside
                 pe->code = 2;
                 pe->v_edge[0] = f2IntersectionDelta(pe->v_ends[0],pe->v_ends[1],sp->vertices[3].v0,sp->vertices[3].v10);
+                pe->vflag_edge[0] = 0b1000;
             }
         }
         return;
