@@ -104,13 +104,9 @@ void MyGLWidget::InitSrcPolygon()
         if(theta_file.atEnd()){
             theta_file.seek(0);
         }
-    }else{
-        float offset = (float)(ceil(drand48()*4)*M_PI/2);
-        theta = 2.0*M_PI*alpha;
     }
-    glm::vec2 Tpre(-alpha,alpha);
-    glm::vec2 Tpost(0.0f,-alpha);
-    glm::vec2 S(1.0f,1.0f);
+
+    theta = 2.0*M_PI*alpha;
 
     //
     // shear and scaling test
@@ -126,39 +122,33 @@ void MyGLWidget::InitSrcPolygon()
 //    M = glm::shearY(M,1.0f);
 //    M = glm::scale(M,glm::vec2(1.1f,0.75f));
 
-
-
-
-
-
-
-
     //
     // interleaved vertices and edges test
     //
 //    M = glm::translate(M,glm::vec2(0.5,-0.5));
 //    M = glm::rotate(M,theta);
 //    M = glm::scale(M,glm::vec2(3.0,1.0));
-//    M = glm::rotate(M,5.0f*(float)M_PI/4.0f);
+//    M = glm::rotate(M,3.0f*(float)M_PI/4.0f);
 //    M = glm::scale(M,glm::vec2(0.5,0.5));
 //    M = glm::translate(M,glm::vec2(-0.5,0.5));
 
     //
     // rotate about the center of the pixel
     //
-    M = glm::translate(M,glm::vec2(0.5f,-0.5f));
-    M = glm::rotate(M,2.0f*(float)M_PI*alpha);
-    M = glm::translate(M,glm::vec2(-0.5f,0.5f));
+//    M = glm::translate(M,glm::vec2(0.5f,-0.5f));
+//    M = glm::rotate(M,2.0f*(float)M_PI*alpha);
+//    M = glm::translate(M,glm::vec2(-0.5f,0.5f));
+
+    //
+    // three vertices in one pixel test
+    //
+    M = glm::translate(M, glm::vec2(0.25f,-0.5f));
+    M = glm::rotate(M,theta);
+    M = glm::scale(M,glm::vec2(0.5f,0.5f));
+    M = glm::translate(M, glm::vec2(-0.5f,0.5f));
 
 
 
-
-
-    //M = glm::translate(M,Tpost);
-    //M = glm::shearX(M,-1.0f/64.0f);
-    //M = glm::rotate(M,theta);
-    //M = glm::scale(M,S);
-    //M = glm::translate(M,Tpre);
     SrcPolygonInitVertices(&srcPolygon, vertices, M);
 
     SrcPolygonInitEdges(&srcPolygon);
@@ -317,7 +307,8 @@ void MyGLWidget::BisectAndDrawPixels(void){
             polygon.N = 0;
             int pixelVFlag = pixelVFlags[y][x];
             if(pixelVFlag==0b0001 || pixelVFlag==0b0010
-                    || pixelVFlag==0b0100 || pixelVFlag==0b1000){
+                    || pixelVFlag==0b0100 || pixelVFlag==0b1000
+                    || pixelVFlag==0b0101 || pixelVFlag==0b1010){
                 //
                 // single vertex in the pixel
                 //
@@ -325,152 +316,6 @@ void MyGLWidget::BisectAndDrawPixels(void){
                 PolygonAddEdgeSingleVertexForward(&polygon,xEdgeBottom,pixelVFlag,&srcPolygon);
                 PolygonAddEdgeSingleVertexReverse(&polygon,yEdgeRight,pixelVFlag,&srcPolygon);
                 PolygonAddEdgeSingleVertexReverse(&polygon,xEdgeTop,pixelVFlag,&srcPolygon);
-            }else if(pixelVFlag==0b0101){
-                // vertices in the pixel and edge vertices are interleaved
-                //
-                // find the diagonal
-                //
-                glm::vec2 vdiag = srcPolygon.vertices[1].v0 - srcPolygon.vertices[3].v0;
-                //
-                // determine the quadrant that the diagonal is in
-                //
-                int quadrant;
-                if(vdiag.y<=0.0f){
-                    if(vdiag.x<=0.0f){
-                        quadrant = 0;
-                    }else{
-                        quadrant = 1;
-                    }
-                }else{
-                    if(vdiag.x>=0.0f){
-                        quadrant = 2;
-                    }else{
-                        quadrant = 3;
-                    }
-                }
-                //
-                // render the first contained source vertex
-                //
-                PolygonAddVertex(&polygon,srcPolygon.vertices[0].v0);
-                //
-                // render the sides for the quadrant
-                //
-                switch(quadrant){
-                case 0:
-                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
-                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
-                    break;
-                case 1:
-                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
-                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
-                    break;
-                case 2:
-                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
-                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
-                    break;
-                case 3:
-                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
-                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
-                    break;
-                }
-                //
-                // render the second contained source vertex
-                //
-                PolygonAddVertex(&polygon,srcPolygon.vertices[2].v0);
-                //
-                // render the opposite sides for the quadrant
-                //
-                switch(quadrant){
-                case 0:
-                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
-                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
-                    break;
-                case 1:
-                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
-                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
-                    break;
-                case 2:
-                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
-                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
-                    break;
-                case 3:
-                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
-                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
-                    break;
-                }
-            }else if(pixelVFlag==0b1010){
-                // vertices in the pixel and edge vertices are interleaved
-                //
-                // find the diagonal
-                //
-                glm::vec2 vdiag = srcPolygon.vertices[2].v0 - srcPolygon.vertices[0].v0;
-                //
-                // determine the quadrant that the diagonal is in
-                //
-                int quadrant;
-                if(vdiag.y<=0.0f){
-                    if(vdiag.x<=0.0f){
-                        quadrant = 0;
-                    }else{
-                        quadrant = 1;
-                    }
-                }else{
-                    if(vdiag.x>=0.0f){
-                        quadrant = 2;
-                    }else{
-                        quadrant = 3;
-                    }
-                }
-                //
-                // render the first contained source vertex
-                //
-                PolygonAddVertex(&polygon,srcPolygon.vertices[1].v0);
-                //
-                // render the sides for the quadrant
-                //
-                switch(quadrant){
-                case 0:
-                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
-                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
-                    break;
-                case 1:
-                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
-                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
-                    break;
-                case 2:
-                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
-                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
-                    break;
-                case 3:
-                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
-                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
-                    break;
-                }
-                //
-                // render the second contained source vertex
-                //
-                PolygonAddVertex(&polygon,srcPolygon.vertices[3].v0);
-                //
-                // render the opposite sides for the quadrant
-                //
-                switch(quadrant){
-                case 0:
-                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
-                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
-                    break;
-                case 1:
-                    PolygonAddEdgeReverse(&polygon,xEdgeTop);
-                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
-                    break;
-                case 2:
-                    PolygonAddEdgeForward(&polygon,yEdgeLeft);
-                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
-                    break;
-                case 3:
-                    PolygonAddEdgeForward(&polygon,xEdgeBottom);
-                    PolygonAddEdgeReverse(&polygon,yEdgeRight);
-                    break;
-                }
             }else{
                 // vertices in the pixel are drawn all at once
                 bool iv_drawn = false;
@@ -796,13 +641,15 @@ void MyGLWidget::PolygonAddEdgeSingleVertexForward(Polygon *polygon, PixelEdge *
         PolygonAddVertex(polygon,edge->v_edge[1]);
         break;
     case 2:
-        if(edge->vflag_edge[0]&vflag){
+        vflag &= edge->vflag_edge[0];
+        if(vflag){
             PolygonAddVFlags(vflag, sp, polygon);
         }
         PolygonAddVertex(polygon,edge->v_edge[0]);
         break;
     case 3:
-        if(edge->vflag_edge[0]&vflag){
+        vflag &= edge->vflag_edge[0];
+        if(vflag){
             PolygonAddVFlags(vflag, sp, polygon);
         }
         PolygonAddVertex(polygon,edge->v_edge[0]);
@@ -820,7 +667,8 @@ void MyGLWidget::PolygonAddEdgeSingleVertexReverse(Polygon *polygon, PixelEdge *
         }
         break;
     case 1:
-        if(edge->vflag_edge[1]&vflag){
+        vflag &= edge->vflag_edge[1];
+        if(vflag){
             PolygonAddVFlags(vflag, sp, polygon);
         }
         PolygonAddVertex(polygon,edge->v_edge[1]);
@@ -830,7 +678,8 @@ void MyGLWidget::PolygonAddEdgeSingleVertexReverse(Polygon *polygon, PixelEdge *
         PolygonAddVertex(polygon,edge->v_edge[0]);
         break;
     case 3:
-        if(edge->vflag_edge[1]&vflag){
+        vflag &= edge->vflag_edge[1];
+        if(vflag){
             PolygonAddVFlags(vflag, sp, polygon);
         }
         PolygonAddVertex(polygon,edge->v_edge[1]);
