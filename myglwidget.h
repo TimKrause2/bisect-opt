@@ -13,7 +13,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/matrix_transform_2d.hpp>
 
-#define GRID_SIZE 3
+#define GRID_SIZE 32
 
 //
 // vertex bits
@@ -101,6 +101,9 @@ private:
     Polygon polygon;
     int Npixelx;
     int Npixely;
+    int grid_size;
+    int width;
+    int height;
     void InitPixels(void);
     //void BisectEdges(void);
     void PolygonAddSingleVFlag(Polygon *polygon, int flags, SrcPolygon *sp);

@@ -50,39 +50,40 @@ void MyGLWidget::initializeGL(){
 void MyGLWidget::resizeGL(int w, int h){
     glViewport(0,0,w,h);
 
+    width = w;
+    height = h;
+
+}
+
+void MyGLWidget::paintGL(){
+    InitSrcPolygon();
+    InitPixels();
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    GLdouble aspect = (GLdouble)w/h;
-    GLdouble size = 3.0;
+    GLdouble aspect = (GLdouble)width/height;
+    GLdouble size = (float)grid_size;
     if(aspect>=1.0){
-        GLdouble left = -aspect*size/2 + 1.5;
-        GLdouble right = aspect*size/2 + 1.5;
+        GLdouble left = -aspect*size/2 + size/2;
+        GLdouble right = aspect*size/2 + size/2;
         GLdouble top = 0.0;
-        GLdouble bottom = -3.0;
+        GLdouble bottom = -size;
         GLdouble near = 1.0;
         GLdouble far = -1.0;
         glOrtho(left,right,bottom,top,near,far);
     }else{
         GLdouble left = 0.0;
         GLdouble right = 3.0;
-        GLdouble top = 1.0/aspect*size/2 - 1.5;
-        GLdouble bottom = -1.0/aspect*size/2 - 1.5;
+        GLdouble top = 1.0/aspect*size/2 - size/2;
+        GLdouble bottom = -1.0/aspect*size/2 - size/2;
         GLdouble near = 1.0;
         GLdouble far = -1.0;
         glOrtho(left,right,bottom,top,near,far);
     }
-}
-
-void MyGLWidget::paintGL(){
     glColor3f(0.25f,0.25f,0.25f);
     DrawGrid();
 
-    InitSrcPolygon();
-    InitPixels();
-    //BisectEdges();
     glColor3f(0.5f,0.5f,0.5f);
     BisectAndDrawPixels();
-    //DrawPolygons();
     DrawSrcPolygon();
     alpha += dalpha;
     if(alpha>=1.0f)alpha-=1.0f;
@@ -125,12 +126,12 @@ void MyGLWidget::InitSrcPolygon()
     //
     // interleaved vertices and edges test
     //
-    M = glm::translate(M,glm::vec2(0.5,-0.5));
-    M = glm::rotate(M,theta);
-    M = glm::scale(M,glm::vec2(3.0,1.0));
-    M = glm::rotate(M,(float)M_PI/4.0f);
-    M = glm::scale(M,glm::vec2(0.5,0.5));
-    M = glm::translate(M,glm::vec2(-0.5,0.5));
+//    M = glm::translate(M,glm::vec2(0.5,-0.5));
+//    M = glm::rotate(M,theta);
+//    M = glm::scale(M,glm::vec2(3.0,1.0));
+//    M = glm::rotate(M,(float)M_PI/4.0f);
+//    M = glm::scale(M,glm::vec2(0.5,0.5));
+//    M = glm::translate(M,glm::vec2(-0.5,0.5));
 
     //
     // rotate about the center of the pixel
@@ -147,7 +148,16 @@ void MyGLWidget::InitSrcPolygon()
 //    M = glm::scale(M,glm::vec2(0.5f,0.5f));
 //    M = glm::translate(M, glm::vec2(-0.5f,0.5f));
 
-
+    //
+    // glitch transform
+    //
+    float theta_glitch = 90.0;
+    theta_glitch *= M_PI/180.0;
+    M = glm::translate(M,glm::vec2(alpha,0.0));
+    M = glm::rotate(M, theta_glitch);
+    M = glm::scale(M,glm::vec2(1.0f/3.0f,3.0f));
+    M = glm::rotate(M,-theta_glitch);
+    M = glm::inverse(M);
 
     SrcPolygonInitVertices(&srcPolygon, vertices, M);
 
@@ -170,6 +180,9 @@ void MyGLWidget::InitPixels()
 
     glm::ivec2 i2_v0(i2_min.x,i2_max.y);
     glm::vec2 v0 = i2_v0;
+
+    grid_size = (Npixelx>Npixely)?Npixelx:Npixely;
+    if(grid_size<3) grid_size = 3;
 
     if(Npixelx==1 && Npixely==1){
         pixelVertices[0][0].v = v0;
@@ -957,17 +970,18 @@ void MyGLWidget::DrawPolygon()
 
 void MyGLWidget::DrawGrid(void){
     glBegin(GL_LINES);
-    for(int x=0;x<4;x++){
+    float f_grid_size = (float)grid_size;
+    for(int x=0;x<=grid_size;x++){
         float x_real = (float)x;
         glVertex2f(x_real,0.0f);
-        glVertex2f(x_real,-3.0f);
+        glVertex2f(x_real,-f_grid_size);
     }
     glEnd();
     glBegin(GL_LINES);
-    for(int y=0;y>-4;y--){
+    for(int y=0;y>=-grid_size;y--){
         float y_real = (float)y;
         glVertex2f(0.0f, y_real);
-        glVertex2f(3.0,y_real);
+        glVertex2f(f_grid_size,y_real);
     }
     glEnd();
 }
