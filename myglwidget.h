@@ -12,6 +12,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtx/matrix_transform_2d.hpp>
+#include <list>
 
 #define GRID_SIZE 32
 
@@ -64,6 +65,8 @@ glm::vec2 f2IntersectionDelta(glm::vec2 a0, glm::vec2 a1, glm::vec2 b0, glm::vec
 
 glm::ivec2 convert_ivec2_plus(glm::vec2 v);
 
+glm::vec2 v2conform_axis(glm::vec2 v);
+
 float f2cross(glm::vec2 &a, glm::vec2 &b);
 
 struct Polygon {
@@ -88,6 +91,11 @@ private:
     float alpha;
     float dalpha;
     float theta;
+    glm::mat3 M_inv;
+    glm::vec2 v2_dsrcx;
+    glm::vec2 v2_dsrcy;
+    int i_fail;
+    std::vector<glm::vec2> fail_vector;
     QTimer *timer;
     QFile  theta_file;
     bool theta_file_write;
@@ -114,6 +122,8 @@ private:
     void PolygonAddEdgeSingleVertexReverse(Polygon *polygon, PixelEdge *edge, int vflag, SrcPolygon *sp);
     //void DrawPolygons(void);
     void BisectAndDrawPixels(void);
+    bool BisectAndVerifyPixels(void);
+    void EmulateTransform(int width, int height, glm::mat3 &M_inv);
     void DrawSrcPolygon(void);
     void DrawPolygon(void);
     void DrawGrid(void);

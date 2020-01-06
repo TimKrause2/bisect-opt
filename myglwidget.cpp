@@ -13,6 +13,24 @@ MyGLWidget::MyGLWidget(QWidget *parent) :
 
     connect(timer, &QTimer::timeout, this, &MyGLWidget::timer_func);
 
+    //
+    // glitch transform
+    //
+    float theta_glitch = 45.0;
+    theta_glitch *= M_PI/180.0;
+    glm::vec2 A(127.0f/2.0f,-127.0f/2.0f);
+    glm::mat3 M = glm::translate(glm::mat3(1.0f),A);
+    M = glm::rotate(M, theta_glitch);
+    M = glm::scale(M,glm::vec2(1.0f/3.0f,3.0f));
+    M = glm::rotate(M,-theta_glitch);
+    M = glm::translate(M,-A);
+
+    M_inv = glm::inverse(M);
+
+    EmulateTransform(128,128,M_inv);
+
+    i_fail = 0;
+
     theta_file_open = false;
     if(theta_file.open(QIODevice::ReadOnly)){
         // check the size
@@ -159,7 +177,17 @@ void MyGLWidget::InitSrcPolygon()
     M = glm::rotate(M,-theta_glitch);
     M = glm::inverse(M);
 
-    SrcPolygonInitVertices(&srcPolygon, vertices, M);
+    if(fail_vector.empty()){
+        SrcPolygonInitVertices(&srcPolygon, vertices, M);
+    }else{
+        glm::vec2 v2_src00 = fail_vector[i_fail];
+        srcPolygon.vertices[0].v0 = v2_src00;
+        srcPolygon.vertices[1].v0 = v2_src00 + v2_dsrcy;
+        srcPolygon.vertices[2].v0 = v2_src00 + v2_dsrcy + v2_dsrcx;
+        srcPolygon.vertices[3].v0 = v2_src00 + v2_dsrcx;
+        i_fail++;
+        if(i_fail==fail_vector.size())i_fail=0;
+    }
 
     SrcPolygonInitEdges(&srcPolygon);
 
@@ -289,6 +317,8 @@ void MyGLWidget::BisectAndDrawPixels(void){
             xEdgeBottom->inside_ends[1] = pixel11->inside;
             if(y<(Npixely-1)){
                 PixelEdgeBisectSrcPolygon(xEdgeBottom,&srcPolygon);
+            }else{
+                PixelEdgeBorderBisectSrcPolygon(xEdgeBottom,&srcPolygon);
             }
             //
             // initialize the right edge
@@ -300,6 +330,8 @@ void MyGLWidget::BisectAndDrawPixels(void){
             yEdgeRight->inside_ends[1] = pixel11->inside;
             if(x<(Npixelx-1)){
                 PixelEdgeBisectSrcPolygon(yEdgeRight,&srcPolygon);
+            }else{
+                PixelEdgeBorderBisectSrcPolygon(yEdgeRight,&srcPolygon);
             }
             //
             // now draw the pixel
@@ -464,65 +496,266 @@ void MyGLWidget::BisectAndDrawPixels(void){
     }
 }
 
-/*
-void MyGLWidget::BisectEdges()
+bool MyGLWidget::BisectAndVerifyPixels()
 {
-    if(Npixelx==1 && Npixely==1)
-        return;
-    Pixel *pixel00 = &pixels[0][0];
-    Pixel *pixel10 = &pixels[0][1];
-    Pixel *pixel01 = &pixels[1][0];
-    BisectParams bp;
-    for(int y=0;y<Npixely;y++){
-        for(int x=0;x<Npixelx;x++,pixel00++,pixel10++,pixel01++){
-            if(x==0){
-                // border bisect allong the yaxis edge
-                bp.v[0] = pixel00->v;
-                bp.inside[0] = pixel00->inside;
-                bp.v[1] = pixel01->v;
-                bp.inside[1] = pixel01->inside;
-                bp.edge = &pixel00->yedge;
-                PixelEdgeBorderBisectSrcPolygon(&bp,&srcPolygon);
-            }else{
-                bp.v[0] = pixel00->v;
-                bp.inside[0] = pixel00->inside;
-                bp.v[1] = pixel01->v;
-                bp.inside[1] = pixel01->inside;
-                bp.edge = &pixel00->yedge;
-                PixelEdgeBisectSrcPolygon(&bp,&srcPolygon);
-            }
+    PixelVertex *pixel00 = &pixelVertices[0][0];
+    PixelVertex *pixel10 = &pixelVertices[0][1];
+    PixelVertex *pixel01 = &pixelVertices[1][0];
+    PixelVertex *pixel11 = &pixelVertices[1][1];
+    PixelEdge *xEdgeTop = &xEdges[0][0];
+    PixelEdge *xEdgeBottom = &xEdges[1][0];
+    PixelEdge *yEdgeLeft = &yEdges[0][0];
+    PixelEdge *yEdgeRight = &yEdges[0][1];
+    int x;
+    int y;
+    if(Npixelx==1 && Npixely==1){
+        return true;
+    }
+    float src_area = SrcPolygonArea(&srcPolygon);
+    float total_area = 0.0f;
+    for(y=0;y<Npixely;y++){
+        for(x=0;x<Npixelx;x++,pixel00++,pixel01++,pixel10++,pixel11++,xEdgeTop++,
+            xEdgeBottom++,yEdgeLeft++,yEdgeRight++){
+            //
+            // bisect the new edges
+            //
+            // test for the top of the grid
+            //
             if(y==0){
-                bp.v[0] = pixel00->v;
-                bp.inside[0] = pixel00->inside;
-                bp.v[1] = pixel10->v;
-                bp.inside[1] = pixel10->inside;
-                bp.edge = &pixel00->xedge;
-                PixelEdgeBorderBisectSrcPolygon(&bp,&srcPolygon);
+                xEdgeTop->code = 0;
+                xEdgeTop->v_ends[0] = pixel00->v;
+                xEdgeTop->inside_ends[0] = pixel00->inside;
+                xEdgeTop->v_ends[1] = pixel10->v;
+                xEdgeTop->inside_ends[1] = pixel10->inside;
+                PixelEdgeBorderBisectSrcPolygon(xEdgeTop,&srcPolygon);
+            }
+            //
+            // test for the left most edge
+            //
+            if(x==0){
+                yEdgeLeft->code = 0;
+                yEdgeLeft->v_ends[0] = pixel00->v;
+                yEdgeLeft->inside_ends[0] = pixel00->inside;
+                yEdgeLeft->v_ends[1] = pixel01->v;
+                yEdgeLeft->inside_ends[1] = pixel01->inside;
+                PixelEdgeBorderBisectSrcPolygon(yEdgeLeft,&srcPolygon);
+            }
+            //
+            // bisect the fresh bottom edge
+            //
+            xEdgeBottom->code = 0;
+            xEdgeBottom->v_ends[0] = pixel01->v;
+            xEdgeBottom->inside_ends[0] = pixel01->inside;
+            xEdgeBottom->v_ends[1] = pixel11->v;
+            xEdgeBottom->inside_ends[1] = pixel11->inside;
+            if(y<(Npixely-1)){
+                PixelEdgeBisectSrcPolygon(xEdgeBottom,&srcPolygon);
             }else{
-                bp.v[0] = pixel00->v;
-                bp.inside[0] = pixel00->inside;
-                bp.v[1] = pixel10->v;
-                bp.inside[1] = pixel10->inside;
-                bp.edge = &pixel00->xedge;
-                PixelEdgeBisectSrcPolygon(&bp,&srcPolygon);
+                PixelEdgeBorderBisectSrcPolygon(xEdgeBottom,&srcPolygon);
             }
-            // test for the right most edge
-            if(x==Npixelx-1){
-                pixel10->yedge.code = 0;
+            //
+            // initialize the right edge
+            //
+            yEdgeRight->code = 0;
+            yEdgeRight->v_ends[0] = pixel10->v;
+            yEdgeRight->inside_ends[0] = pixel10->inside;
+            yEdgeRight->v_ends[1] = pixel11->v;
+            yEdgeRight->inside_ends[1] = pixel11->inside;
+            if(x<(Npixelx-1)){
+                PixelEdgeBisectSrcPolygon(yEdgeRight,&srcPolygon);
+            }else{
+                PixelEdgeBorderBisectSrcPolygon(yEdgeRight,&srcPolygon);
             }
-            // test for the bottom most edge
-            if(y==Npixely-1){
-                pixel01->xedge.code = 0;
+            //
+            // now create the polygon for this pixel
+            //
+            polygon.N = 0;
+            int pixelVFlag = pixelVFlags[y][x];
+            if(pixelVFlag==0b0001 || pixelVFlag==0b0010
+                    || pixelVFlag==0b0100 || pixelVFlag==0b1000
+                    || pixelVFlag==0b0101 || pixelVFlag==0b1010){
+                //
+                // single vertex in the pixel
+                //
+                PolygonAddEdgeSingleVertexForward(&polygon,yEdgeLeft,pixelVFlag,&srcPolygon);
+                PolygonAddEdgeSingleVertexForward(&polygon,xEdgeBottom,pixelVFlag,&srcPolygon);
+                PolygonAddEdgeSingleVertexReverse(&polygon,yEdgeRight,pixelVFlag,&srcPolygon);
+                PolygonAddEdgeSingleVertexReverse(&polygon,xEdgeTop,pixelVFlag,&srcPolygon);
+            }else{
+                // vertices in the pixel are drawn all at once
+                bool iv_drawn = false;
+                //
+                // draw the left edge
+                //
+                switch(yEdgeLeft->code){
+                case 0:
+                    if(yEdgeLeft->inside_ends[0]==0b1111){
+                        PolygonAddVertex(&polygon,yEdgeLeft->v_ends[0]);
+                    }else{
+                        PolygonAddMultiVFlag(&polygon, pixelVFlag, &srcPolygon);
+                        iv_drawn = true;
+                    }
+                    break;
+                case 1:
+                    PolygonAddVertex(&polygon,yEdgeLeft->v_ends[0]);
+                    PolygonAddVertex(&polygon,yEdgeLeft->v_edge[1]);
+                    break;
+                case 2:
+                    PolygonAddVertex(&polygon,yEdgeLeft->v_edge[0]);
+                    break;
+                case 3:
+                    PolygonAddVertex(&polygon,yEdgeLeft->v_edge[0]);
+                    PolygonAddVertex(&polygon,yEdgeLeft->v_edge[1]);
+                    break;
+                }
+                //
+                // draw the bottom edge
+                //
+                switch(xEdgeBottom->code){
+                case 0:
+                    if(xEdgeBottom->inside_ends[0]==0b1111){
+                        PolygonAddVertex(&polygon,xEdgeBottom->v_ends[0]);
+                    }else{
+                        if(!iv_drawn){
+                            PolygonAddMultiVFlag(&polygon, pixelVFlag, &srcPolygon);
+                            iv_drawn = true;
+                        }
+                    }
+                    break;
+                case 1:
+                    PolygonAddVertex(&polygon,xEdgeBottom->v_ends[0]);
+                    PolygonAddVertex(&polygon,xEdgeBottom->v_edge[1]);
+                    break;
+                case 2:
+                    PolygonAddVertex(&polygon,xEdgeBottom->v_edge[0]);
+                    break;
+                case 3:
+                    PolygonAddVertex(&polygon,xEdgeBottom->v_edge[0]);
+                    PolygonAddVertex(&polygon,xEdgeBottom->v_edge[1]);
+                    break;
+                }
+                //
+                // draw the right edge - it's in the reverse direction to
+                // the drawing order
+                //
+                switch(yEdgeRight->code){
+                case 0:
+                    if(yEdgeRight->inside_ends[1]==0b1111){
+                        PolygonAddVertex(&polygon,yEdgeRight->v_ends[1]);
+                    }else{
+                        if(!iv_drawn){
+                            PolygonAddMultiVFlag(&polygon, pixelVFlag, &srcPolygon);
+                            iv_drawn = true;
+                        }
+                    }
+                    break;
+                case 1:
+                    PolygonAddVertex(&polygon,yEdgeRight->v_edge[1]);
+                    break;
+                case 2:
+                    PolygonAddVertex(&polygon,yEdgeRight->v_ends[1]);
+                    PolygonAddVertex(&polygon,yEdgeRight->v_edge[0]);
+                    break;
+                case 3:
+                    PolygonAddVertex(&polygon,yEdgeRight->v_edge[1]);
+                    PolygonAddVertex(&polygon,yEdgeRight->v_edge[0]);
+                    break;
+                }
+                //
+                // draw the top edge - it's in the reverse direction
+                // as well
+                //
+                switch(xEdgeTop->code){
+                case 0:
+                    if(xEdgeTop->inside_ends[1]==0b1111){
+                        PolygonAddVertex(&polygon,xEdgeTop->v_ends[1]);
+                    }else{
+                        if(!iv_drawn){
+                            PolygonAddMultiVFlag(&polygon, pixelVFlag, &srcPolygon);
+                            iv_drawn = true;
+                        }
+                    }
+                    break;
+                case 1:
+                    PolygonAddVertex(&polygon,xEdgeTop->v_edge[1]);
+                    break;
+                case 2:
+                    PolygonAddVertex(&polygon,xEdgeTop->v_ends[1]);
+                    PolygonAddVertex(&polygon,xEdgeTop->v_edge[0]);
+                    break;
+                case 3:
+                    PolygonAddVertex(&polygon,xEdgeTop->v_edge[1]);
+                    PolygonAddVertex(&polygon,xEdgeTop->v_edge[0]);
+                    break;
+                }
+
+            }
+            total_area += PolygonArea(&polygon);
+        }
+        //
+        // advance the pointers to the next line
+        //
+        int offset = (GRID_SIZE+1) - x;
+        pixel00 += offset;
+        pixel01 += offset;
+        pixel10 += offset;
+        pixel11 += offset;
+        yEdgeLeft += offset;
+        yEdgeRight += offset;
+        offset = GRID_SIZE - x;
+        xEdgeTop += offset;
+        xEdgeBottom += offset;
+    }
+    float area_error = (total_area - src_area)/src_area;
+    if(fabsf(area_error)>0.05f){
+        qDebug("verify area_error:%f",area_error);
+        return false;
+    }
+    return true;
+}
+
+glm::vec2 v2conform_axis(glm::vec2 v){
+    glm::vec2 v_abs = glm::abs(v);
+    if(v_abs.x>=v_abs.y){
+        float tan_theta = v_abs.y/v_abs.x;
+        if(tan_theta < 1e-5){
+            v_abs.y=0;
+        }
+    }else{
+        float tan_theta = v_abs.x/v_abs.y;
+        if(tan_theta < 1e-5){
+            v_abs.x=0;
+        }
+    }
+    return v_abs * glm::sign(v);
+}
+
+
+void MyGLWidget::EmulateTransform(int width, int height, glm::mat3 &M_inv)
+{
+    glm::vec3 v3_dx(1.0f,0.0f,0.0f);
+    glm::vec3 v3_dy(0.0f,-1.0f,0.0f);
+    v2_dsrcx = v2conform_axis(glm::vec2(M_inv*v3_dx));
+    v2_dsrcy = v2conform_axis(glm::vec2(M_inv*v3_dy));
+
+    for(int y=0;y<height;y++){
+        glm::vec3 v3_y(0.0f,-(float)y,1.0f);
+        glm::vec2 v2_src00(M_inv*v3_y);
+        for(int x=0;x<width;x++,v2_src00+=v2_dsrcx){
+            srcPolygon.vertices[0].v0 = v2_src00;
+            srcPolygon.vertices[1].v0 = v2_src00 + v2_dsrcy;
+            srcPolygon.vertices[2].v0 = v2_src00 + v2_dsrcy + v2_dsrcx;
+            srcPolygon.vertices[3].v0 = v2_src00 + v2_dsrcx;
+
+            SrcPolygonInitEdges(&srcPolygon);
+            InitPixels();
+            if(!BisectAndVerifyPixels()){
+                qDebug("pixel failed x:%d y:%d",x,y);
+                fail_vector.push_back(v2_src00);
             }
         }
-        // move the pixel pointers to the next line
-        int offset = PIXEL_DIM - Npixelx;
-        pixel00+=offset;
-        pixel10+=offset;
-        pixel01+=offset;
     }
 }
-*/
 
 
 void MyGLWidget::PolygonAddSingleVFlag(Polygon *polygon, int flags, SrcPolygon *sp)
@@ -1217,6 +1450,7 @@ glm::vec2 f2IntersectionDelta(glm::vec2 a0, glm::vec2 a1, glm::vec2 b0, glm::vec
     float t_det = d_a_dot_d_a*d_b_dot_d_b - d_a_dot_d_b*d_a_dot_d_b;
     float t = (t_num_p - t_num_m) / t_det;
     if(!isfinite(t)){
+        qDebug("infinite result t_det:%f",t_det);
         t=0.5f;
     }
     if(t<0.0f)t=0.0f;
