@@ -19,12 +19,12 @@ MyGLWidget::MyGLWidget(QWidget *parent) :
     //
     // glitch transform
     //
-    float theta_glitch = 45.0;
+    float theta_glitch = 17.0;
     theta_glitch *= M_PI/180.0;
     glm::vec2 A(127.0f/2.0f,-127.0f/2.0f);
     glm::mat3 M = glm::translate(glm::mat3(1.0f),A);
     M = glm::rotate(M, theta_glitch);
-    M = glm::scale(M,glm::vec2(1.0f/3.0f,3.0f));
+    M = glm::scale(M,glm::vec2(1.0f/1.0001f,1.0001f));
     M = glm::rotate(M,-theta_glitch);
     M = glm::translate(M,-A);
 
@@ -725,7 +725,7 @@ bool MyGLWidget::BisectAndVerifyPixels()
         xEdgeBottom += offset;
     }
     float area_error = (total_area - src_area)/src_area;
-    if(fabsf(area_error)>0.05f){
+    if(fabsf(area_error)>0.001f){
         qDebug("verify area_error:%f",area_error);
         return false;
     }
@@ -736,12 +736,12 @@ glm::vec2 v2conform_axis(glm::vec2 v){
     glm::vec2 v_abs = glm::abs(v);
     if(v_abs.x>=v_abs.y){
         float tan_theta = v_abs.y/v_abs.x;
-        if(tan_theta < 1e-5){
+        if(tan_theta < 1e-3){
             v_abs.y=0;
         }
     }else{
         float tan_theta = v_abs.x/v_abs.y;
-        if(tan_theta < 1e-5){
+        if(tan_theta < 1e-3){
             v_abs.x=0;
         }
     }
