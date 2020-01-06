@@ -7,6 +7,7 @@
 #include <QOpenGLFunctions>
 #include <QTimer>
 #include <QFile>
+#include <QKeyEvent>
 
 #define GLM_ENABLE_EXPERIMENTAL
 
@@ -87,6 +88,7 @@ protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;
     void paintGL() override;
+    void keyPressEvent(QKeyEvent *event);
 private:
     float alpha;
     float dalpha;
@@ -95,6 +97,7 @@ private:
     glm::vec2 v2_dsrcx;
     glm::vec2 v2_dsrcy;
     int i_fail;
+    bool advance_i_fail;
     std::vector<glm::vec2> fail_vector;
     QTimer *timer;
     QFile  theta_file;

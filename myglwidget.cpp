@@ -6,9 +6,12 @@ MyGLWidget::MyGLWidget(QWidget *parent) :
     QOpenGLWidget(parent),
     theta_file("/tmp/theta.bin")
 {
+    setFocusPolicy(Qt::ClickFocus);
+    grabKeyboard();
+
     alpha = 0.0f;
     dalpha = 0.1/60.0;
-
+    advance_i_fail = false;
     timer = new QTimer(this);
 
     connect(timer, &QTimer::timeout, this, &MyGLWidget::timer_func);
@@ -108,6 +111,18 @@ void MyGLWidget::paintGL(){
 
 }
 
+void MyGLWidget::keyPressEvent(QKeyEvent *event)
+{
+    switch(event->key()){
+    case Qt::Key_Space:
+        advance_i_fail = true;
+        break;
+    default:
+        QOpenGLWidget::keyPressEvent(event);
+        break;
+    }
+}
+
 void MyGLWidget::InitSrcPolygon()
 {
     glm::vec2 vertices[4] = {
@@ -185,8 +200,11 @@ void MyGLWidget::InitSrcPolygon()
         srcPolygon.vertices[1].v0 = v2_src00 + v2_dsrcy;
         srcPolygon.vertices[2].v0 = v2_src00 + v2_dsrcy + v2_dsrcx;
         srcPolygon.vertices[3].v0 = v2_src00 + v2_dsrcx;
-        i_fail++;
-        if(i_fail==fail_vector.size())i_fail=0;
+        if(advance_i_fail){
+            i_fail++;
+            if(i_fail==fail_vector.size())i_fail=0;
+            advance_i_fail = false;
+        }
     }
 
     SrcPolygonInitEdges(&srcPolygon);
@@ -490,9 +508,9 @@ void MyGLWidget::BisectAndDrawPixels(void){
     float area_error = (total_area - src_area)/src_area;
     if(fabsf(area_error)>0.05f){
         qDebug("area_error:%f",area_error);
-        if(theta_file.openMode()==QIODevice::WriteOnly){
-            theta_file.write((char*)&alpha,sizeof(alpha));
-        }
+//        if(theta_file.openMode()==QIODevice::WriteOnly){
+//            theta_file.write((char*)&alpha,sizeof(alpha));
+//        }
     }
 }
 
@@ -1253,7 +1271,7 @@ int f2BisectSrcPolygon(SrcPolygon *sp, glm::vec2 v)
     for(int e=0;e<4;e++,inside_bit<<=1){
         glm::vec2 vv0 = v - sp->vertices[e].v0;
         f_test = glm::dot(vv0,sp->vertices[e].N);
-        if(f_test > -1.1921e-7f){
+        if(f_test > -1e-5f){
             r|=inside_bit;
         }
     }
@@ -1334,6 +1352,11 @@ void PixelEdgeBisectSrcPolygon(PixelEdge *pe, SrcPolygon *sp)
             }
             break;
         case 3:
+            // test for all outside
+            if((~pe->inside_edge[0])&(~pe->inside_edge[1])&0b1111){
+                pe->code = 0;
+                return;
+            }
             // test for intersection with this edge
             if((pe->inside_edge[0]^pe->inside_edge[1])&edge_bit){
                 if(pe->inside_edge[0]&edge_bit){
